@@ -125,20 +125,29 @@ async def generar_docx(file: UploadFile = File(...)):
 # NUEVO ENDPOINT PARA JSON DIRECTO (ideal para APEX)
 @app.post("/api/generar-json")
 async def generar_json(doc_data: DocumentoCatastral):
+    """Endpoint para JSON directo desde Oracle APEX (sin archivos)"""
     template_path = "templates/1785-003.docx"
     if not os.path.exists(template_path):
         raise HTTPException(500, "Plantilla no encontrada")
 
-    doc = DocxTemplate(template_path)
-    doc.render(doc_data.model_dump())
+    try:
+        doc = DocxTemplate(template_path)
+        doc.render(doc_data.model_dump())
 
-    output = io.BytesIO()
-    doc.save(output)
-    output.seek(0)
+        output = io.BytesIO()
+        doc.save(output)
+        output.seek(0)
 
-    nombre_archivo = doc_data.archivo + ".docx"
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
-    )
+        nombre_archivo = doc_data.archivo
+        if not nombre_archivo.endswith(".docx"):
+            nombre_archivo += ".docx"
+
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f'attachment; filename="{nombre_archivo}"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Error: {str(e)}")
