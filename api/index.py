@@ -123,6 +123,8 @@ async def generar_docx(file: UploadFile = File(...)):
     )
 
 # NUEVO ENDPOINT PARA JSON DIRECTO (ideal para APEX)
+# In your main.py file
+
 @app.post("/api/generar-json")
 async def generar_json(doc_data: DocumentoCatastral):
     """Endpoint para JSON directo desde Oracle APEX (sin archivos)"""
@@ -132,7 +134,13 @@ async def generar_json(doc_data: DocumentoCatastral):
 
     try:
         doc = DocxTemplate(template_path)
-        doc.render(doc_data.model_dump())
+        
+        # --- FIX STARTS HERE ---
+        # Wrap the pydantic model in a dictionary with key 'documento'
+        # This makes {{ documento.predio }} work in the Word template
+        context = { "documento": doc_data.model_dump() }
+        doc.render(context)
+        # --- FIX ENDS HERE ---
 
         output = io.BytesIO()
         doc.save(output)
@@ -150,4 +158,5 @@ async def generar_json(doc_data: DocumentoCatastral):
             }
         )
     except Exception as e:
+        # This prints the actual error to your Vercel logs/response
         raise HTTPException(500, f"Error: {str(e)}")
