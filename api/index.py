@@ -6,6 +6,7 @@ from typing import List
 import json
 import os
 from docx import Document
+#redeploy force
 
 app = FastAPI()
 
