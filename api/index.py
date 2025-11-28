@@ -77,43 +77,72 @@ async def generar_docx(file: UploadFile = File(...)):
         data = json.loads(content)
         validated_data = DatosRequest(**data)
         
-        # Crear documento Word
-        doc = Document()
-        doc.add_heading('Documento Generado Automáticamente', 0)
-        doc.add_paragraph(f"Archivo: {validated_data.archivo}")
-        doc.add_paragraph(f"Total de predios: {len(validated_data.predio)}")
-        doc.add_paragraph("")  # Espacio
+        # Buscar plantilla Word
+        template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', '1785-003.docx')
         
-        # Agregar información de cada predio
-        for idx, predio in enumerate(validated_data.predio, 1):
-            doc.add_heading(f'Predio #{idx}', level=1)
+        if os.path.exists(template_path):
+            # Cargar plantilla existente
+            doc = Document(template_path)
+            print(f"✅ Plantilla cargada: {template_path}")
             
-            # Información básica
-            doc.add_paragraph(f"📋 Clave Catastral: {predio.clave_catastral}")
-            doc.add_paragraph(f"📄 Folio: {predio.folio}")
-            doc.add_paragraph(f"📍 Dirección: {predio.direccion}")
-            doc.add_paragraph(f"👤 Contribuyente: {predio.contribuyente}")
+            # Reemplazar placeholders en la plantilla
+            # Soporta: {{variable}}, {variable}, o $variable
+            replacements = {}
             
-            # Terreno
-            doc.add_heading('Terreno', level=2)
-            doc.add_paragraph(f"• Valor propio: ${predio.terreno.valor_terreno_propio:,.2f}")
-            doc.add_paragraph(f"• Metros propio: {predio.terreno.metros_terreno_propio} m²")
-            doc.add_paragraph(f"• Valor común: ${predio.terreno.valor_terreno_comun:,.2f}")
-            doc.add_paragraph(f"• Metros común: {predio.terreno.metros_terreno_comun} m²")
+            # Si solo hay un predio, usar sus valores directamente
+            if len(validated_data.predio) == 1:
+                predio = validated_data.predio[0]
+                replacements = {
+                    'ARCHIVO': validated_data.archivo,
+                    'CLAVE_CATASTRAL': predio.clave_catastral,
+                    'FOLIO': str(predio.folio),
+                    'DIRECCION': predio.direccion,
+                    'CONTRIBUYENTE': predio.contribuyente,
+                    'VALOR_TERRENO_PROPIO': f"${predio.terreno.valor_terreno_propio:,.2f}",
+                    'METROS_TERRENO_PROPIO': f"{predio.terreno.metros_terreno_propio}",
+                    'VALOR_TERRENO_COMUN': f"${predio.terreno.valor_terreno_comun:,.2f}",
+                    'METROS_TERRENO_COMUN': f"{predio.terreno.metros_terreno_comun}",
+                    'VALOR_CONSTRUCCION_PROPIA': f"${predio.construccion.valor_construccion_propia:,.2f}",
+                    'METROS_CONSTRUCCION_PROPIA': f"{predio.construccion.metros_construccion_propia}",
+                    'VALOR_CONSTRUCCION_COMUN': f"${predio.construccion.valor_construccion_comun:,.2f}",
+                    'METROS_CONSTRUCCION_COMUN': f"{predio.construccion.metros_construccion_comun}",
+                    'IMPUESTO_PREDIAL': f"${predio.impuesto.impuesto_predial:,.2f}",
+                    'CANTIDAD_CON_LETRA': predio.impuesto.cantidad_con_letra
+                }
             
-            # Construcción
-            doc.add_heading('Construcción', level=2)
-            doc.add_paragraph(f"• Valor propia: ${predio.construccion.valor_construccion_propia:,.2f}")
-            doc.add_paragraph(f"• Metros propia: {predio.construccion.metros_construccion_propia} m²")
-            doc.add_paragraph(f"• Valor común: ${predio.construccion.valor_construccion_comun:,.2f}")
-            doc.add_paragraph(f"• Metros común: {predio.construccion.metros_construccion_comun} m²")
+            # Reemplazar en párrafos
+            for paragraph in doc.paragraphs:
+                for key, value in replacements.items():
+                    # Soporta múltiples formatos de placeholder
+                    for pattern in [f'{{{{{key}}}}}', f'{{{key}}}', f'${key}']:
+                        if pattern in paragraph.text:
+                            paragraph.text = paragraph.text.replace(pattern, str(value))
             
-            # Impuesto
-            doc.add_heading('Impuesto Predial', level=2)
-            doc.add_paragraph(f"💰 Monto: ${predio.impuesto.impuesto_predial:,.2f}")
-            doc.add_paragraph(f"📝 En letra: {predio.impuesto.cantidad_con_letra}")
+            # Reemplazar en tablas
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for key, value in replacements.items():
+                            for pattern in [f'{{{{{key}}}}}', f'{{{key}}}', f'${key}']:
+                                if pattern in cell.text:
+                                    cell.text = cell.text.replace(pattern, str(value))
+        else:
+            # Si no existe la plantilla, crear documento básico
+            print(f"⚠️ Plantilla no encontrada: {template_path}")
+            doc = Document()
+            doc.add_heading('Documento Generado Automáticamente', 0)
+            doc.add_paragraph(f"Archivo: {validated_data.archivo}")
+            doc.add_paragraph(f"Total de predios: {len(validated_data.predio)}")
+            doc.add_paragraph("")
             
-            doc.add_paragraph("")  # Espacio entre predios
+            for idx, predio in enumerate(validated_data.predio, 1):
+                doc.add_heading(f'Predio #{idx}', level=1)
+                doc.add_paragraph(f"Clave Catastral: {predio.clave_catastral}")
+                doc.add_paragraph(f"Folio: {predio.folio}")
+                doc.add_paragraph(f"Dirección: {predio.direccion}")
+                doc.add_paragraph(f"Contribuyente: {predio.contribuyente}")
+                doc.add_paragraph(f"Impuesto Predial: ${predio.impuesto.impuesto_predial:,.2f}")
+                doc.add_paragraph("")
         
         # Guardar en archivo temporal
         with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
