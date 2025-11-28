@@ -120,5 +120,4 @@ async def generar_docx(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
-# Para Vercel
-handler = app
+# Para Vercel - No usar handler directo
