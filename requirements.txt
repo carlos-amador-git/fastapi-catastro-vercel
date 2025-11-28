@@ -1,5 +1,4 @@
-fastapi
-uvicorn
-python-multipart
-pydantic
-python-docx
+fastapi==0.115.0
+python-multipart==0.0.9
+pydantic==2.9.2
+python-docx==1.1.2
