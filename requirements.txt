@@ -1,6 +1,5 @@
-fastapi==0.115.0
-uvicorn==0.30.6
-python-multipart==0.0.9
-pydantic==2.9.2
-docxtpl==0.18.0
-jinja2==3.1.4
+fastapi
+uvicorn
+python-multipart
+pydantic
+python-docx
