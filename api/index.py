@@ -64,6 +64,7 @@ async def generar_docx(file: UploadFile = File(...)):
     """
     Recibe un archivo JSON y genera un documento DOCX
     """
+    print(file)
     try:
         # Validar que sea JSON
         if not file.filename.endswith('.json'):
@@ -101,10 +102,10 @@ async def generar_docx(file: UploadFile = File(...)):
                 
                 # Calcular impuestos
                 impuesto_predial = predio.impuesto.impuesto_predial
-                recargos = impuesto_predial * 0.02  # 2% ejemplo
-                gastos_ejecucion = impuesto_predial * 0.01  # 1% ejemplo
+                recargos = impuesto_predial #* 0.02  # 2% ejemplo
+                gastos_ejecucion = impuesto_predial #* 0.01  # 1% ejemplo
                 impuesto_suma = impuesto_predial + recargos + gastos_ejecucion
-                subsidio = impuesto_suma * 0.1  # 10% ejemplo
+                subsidio = impuesto_suma #* 0.1  # 10% ejemplo
                 adeudo_total = impuesto_suma - subsidio
                 
                 from datetime import datetime
