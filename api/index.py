@@ -114,7 +114,8 @@ async def generar_docx(file: UploadFile = File(...)):
         file_stream.seek(0) # Regresar el puntero al inicio del archivo
 
         # Nombre del archivo de salida
-        nombre_salida = doc_data.archivo.replace(".docx", "_generado.docx") if doc_data.archivo else "documento_generado.docx"
+        #nombre_salida = doc_data.archivo.replace(".docx", "_generado.docx") if doc_data.archivo else "documento_generado.docx"
+        nombre_salida = doc_data.archivo
 
         # Retornar como StreamingResponse
         # Esto envía el archivo binario directamente al navegador
