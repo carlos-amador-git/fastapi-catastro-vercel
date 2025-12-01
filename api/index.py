@@ -91,6 +91,7 @@ async def generar_docx(file: UploadFile = File(...)):
     # En Vercel, los archivos estáticos a veces requieren manejo de rutas absoluto
     base_dir = os.path.dirname(os.path.abspath(__file__))
     template_path = os.path.join(base_dir, "templates", doc_data.plantilla_tipo_documento)
+    print(template_path)
     
     # Fallback por si la estructura de carpetas varía en el deploy
     if not os.path.exists(template_path):
