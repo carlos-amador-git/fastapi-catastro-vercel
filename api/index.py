@@ -3,24 +3,26 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 import json
 import os
-import tempfile
+import io # Importante para manejar archivos en memoria
+from docxtpl import DocxTemplate # Importación correcta para plantillas
 
 app = FastAPI()
 
-# CORS - Permite llamadas desde cualquier origen
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción: específica tu dominio
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===== MODELOS =====
+# ... (TUS MODELOS Pydantic SE QUEDAN IGUAL) ...
+# Pégalos aquí (Terreno, Construccion, etc.)
+# ...
+
 class Terreno(BaseModel):
     valor_terreno_propio: Optional[str] = None
     metros_terreno_propio: Optional[str] = None
@@ -68,10 +70,6 @@ class DocumentoCatastral(BaseModel):
     predio: List[Predio]
 
 # ===== ENDPOINTS =====
-@app.get("/")
-def root():
-    return {"status": "ok", "message": "API funcionando correctamente"}
-
 @app.get("/api")
 def api_root():
     return {"status": "ok", "endpoints": ["/api/generar-docx"]}
@@ -86,42 +84,48 @@ async def generar_docx(file: UploadFile = File(...)):
         data = json.loads(content)
         doc_data = DocumentoCatastral.model_validate(data)
     except Exception as e:
+        print(f"Error validacion: {e}") # Log para ver en Vercel dashboard
         raise HTTPException(422, f"Error en validación: {str(e)}")
 
-    # Cargar plantilla
-    template_path = "templates/"+doc_data.plantilla_tipo_documento
+    # Validar ruta de plantilla
+    # En Vercel, los archivos estáticos a veces requieren manejo de rutas absoluto
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    template_path = os.path.join(base_dir, "templates", doc_data.plantilla_tipo_documento)
+    
+    # Fallback por si la estructura de carpetas varía en el deploy
     if not os.path.exists(template_path):
-        raise HTTPException(500, "Plantilla no encontrada")
+        # Intenta buscar en la raíz si no está en templates/
+        template_path = doc_data.plantilla_tipo_documento 
+        
+    if not os.path.exists(template_path):
+        raise HTTPException(500, f"Plantilla no encontrada en: {template_path}")
 
-    doc = DocxTemplate(template_path)
+    try:
+        doc = DocxTemplate(template_path)
 
-    # Renderizar
-    doc.render(doc_data.model_dump())
+        # Renderizar
+        contexto = doc_data.model_dump()
+        doc.render(contexto)
 
-    # Guardar en memoria
-    #output = io.BytesIO()
-    #doc.save(output)
-    doc.save(doc_data.archivo)
-    #output.seek(0)
+        # GUARDAR EN MEMORIA (RAM) - Evita el error de "Read-only file system"
+        file_stream = io.BytesIO()
+        doc.save(file_stream)
+        file_stream.seek(0) # Regresar el puntero al inicio del archivo
 
-    # Nombre del archivo de salida
-    nombre_salida = doc_data.archivo.replace(".docx", "_generado.docx")
+        # Nombre del archivo de salida
+        nombre_salida = doc_data.archivo.replace(".docx", "_generado.docx") if doc_data.archivo else "documento_generado.docx"
 
-    #return StreamingResponse(
-    #    output,
-    #    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    #    headers={"Content-Disposition": f"attachment; filename={doc_data.archivo}"},
-    #)
+        # Retornar como StreamingResponse
+        # Esto envía el archivo binario directamente al navegador
+        return StreamingResponse(
+            file_stream,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={nombre_salida}",
+                "Access-Control-Expose-Headers": "Content-Disposition" # Ayuda al frontend a leer el nombre
+            }
+        )
 
-
-
-
-    # Convertir un solo archivo
-    # convert(doc_data.archivo, "output.pdf")
-
-    return FileResponse(
-            path=doc_data.archivo,
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            # media_type="application/pdf"
-            # filename="Datos históricos por sitio.docx"   # nombre que verá el usuario
-    )
+    except Exception as e:
+        print(f"Error generando docx: {e}")
+        raise HTTPException(500, f"Error generando documento: {str(e)}")
